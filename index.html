@@ -7,39 +7,99 @@
   <!-- Chart.js loaded from a CDN -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
-    body { font-family: Arial, sans-serif; max-width: 900px; margin: 20px auto; padding: 0 16px; color: #222; }
-    h1 { text-align: center; }
-    .card { border: 1px solid #ddd; border-radius: 8px; padding: 16px; margin-bottom: 24px; }
-    .grid { display: grid; grid-template-columns: 40px repeat(5, 1fr); gap: 4px; }
-    .cell { min-height: 60px; display: flex; align-items: center; justify-content: center;
-            font-size: 11px; text-align: center; border-radius: 4px; color: #000; padding: 2px; }
-    .label { display: flex; align-items: center; justify-content: center; font-weight: bold; }
-    .note { font-size: 13px; color: #555; }
-    #error { color: #b00020; }
+    :root { --navy:#0f2a4a; --blue:#2563eb; --bg:#f1f5f9; --card:#ffffff; --text:#1e293b; --muted:#64748b; }
+    * { box-sizing: border-box; }
+    body { margin:0; background:var(--bg); color:var(--text);
+           font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; }
+    header { background: linear-gradient(135deg, var(--navy), var(--blue)); color:#fff;
+             padding: 36px 16px 56px; text-align:center; }
+    header h1 { margin:0 0 6px; font-size: clamp(22px, 4vw, 32px); }
+    header p { margin:0; opacity:.85; font-size:14px; }
+    main { max-width: 1000px; margin: -32px auto 40px; padding: 0 16px; }
+    .kpis { display:grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap:16px; margin-bottom:20px; }
+    .kpi { background:var(--card); border-radius:12px; padding:18px; box-shadow:0 2px 10px rgba(15,42,74,.08); }
+    .kpi .value { font-size:32px; font-weight:700; color:var(--navy); }
+    .kpi .label { font-size:13px; color:var(--muted); margin-top:2px; }
+    .card { background:var(--card); border-radius:12px; padding:22px; margin-bottom:20px;
+            box-shadow:0 2px 10px rgba(15,42,74,.08); }
+    .card h2 { margin:0 0 4px; font-size:18px; color:var(--navy); }
+    .card .sub { margin:0 0 16px; font-size:13px; color:var(--muted); }
+    .chart-wrap { position:relative; height:320px; }
+    /* Heat map grid: label column + 5 impact columns */
+    .heat { display:grid; grid-template-columns: 34px repeat(5, 1fr); gap:5px; }
+    .cell { min-height:62px; border-radius:8px; display:flex; flex-wrap:wrap; gap:3px;
+            align-items:center; justify-content:center; padding:4px; }
+    .chip { background:rgba(255,255,255,.85); color:#111; font-size:11px; font-weight:600;
+            padding:2px 6px; border-radius:10px; }
+    .axis { display:flex; align-items:center; justify-content:center; font-size:12px;
+            font-weight:600; color:var(--muted); text-align:center; }
+    .legend { display:flex; align-items:center; gap:8px; margin-top:14px; font-size:12px; color:var(--muted); }
+    .legend .bar { flex:1; max-width:220px; height:10px; border-radius:5px;
+                   background: linear-gradient(90deg, hsl(120,65%,58%), hsl(60,65%,58%), hsl(0,65%,58%)); }
+    table { width:100%; border-collapse:collapse; font-size:14px; }
+    th, td { text-align:left; padding:10px 8px; border-bottom:1px solid #e2e8f0; }
+    th { color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:.04em; }
+    .score { font-weight:700; color:#111; padding:3px 10px; border-radius:12px; display:inline-block; }
+    #error { color:#b00020; text-align:center; font-weight:600; }
+    footer { text-align:center; font-size:12px; color:var(--muted); padding-bottom:30px; }
   </style>
 </head>
 <body>
-  <h1>MicroFinCo ISO 27001 Compliance Dashboard</h1>
-  <p id="error"></p>
+  <header>
+    <h1>MicroFinCo ISO 27001 Compliance Dashboard</h1>
+    <p>Annex A control coverage and risk overview (fictional training data)</p>
+  </header>
 
-  <div class="card">
-    <h2>Control Status (Gap Analysis)</h2>
-    <canvas id="statusChart"></canvas>
-  </div>
+  <main>
+    <p id="error"></p>
 
-  <div class="card">
-    <h2>Risk Heat Map (Impact x Likelihood)</h2>
-    <div id="heatmap" class="grid"></div>
-    <p class="note">Rows: likelihood (5 = top). Columns: impact (1 to 5). Cells show risk IDs. Green = low score, red = high score.</p>
-  </div>
+    <!-- Summary cards, filled in by the script -->
+    <section class="kpis">
+      <div class="kpi"><div class="value" id="kTotal">-</div><div class="label">Controls evaluated</div></div>
+      <div class="kpi"><div class="value" id="kImpl">-</div><div class="label">Fully implemented</div></div>
+      <div class="kpi"><div class="value" id="kRisks">-</div><div class="label">Risks in register</div></div>
+      <div class="kpi"><div class="value" id="kHigh">-</div><div class="label">High risks (score 15+)</div></div>
+    </section>
+
+    <section class="card">
+      <h2>Control Status</h2>
+      <p class="sub">Number of Annex A controls by implementation status</p>
+      <div class="chart-wrap"><canvas id="statusChart"></canvas></div>
+    </section>
+
+    <section class="card">
+      <h2>Risk Heat Map</h2>
+      <p class="sub">Risks placed by impact (columns) and likelihood (rows)</p>
+      <div id="heatmap" class="heat"></div>
+      <div class="legend"><span>Low</span><div class="bar"></div><span>High</span></div>
+    </section>
+
+    <section class="card">
+      <h2>Top Risks</h2>
+      <p class="sub">Highest scoring risks from the register</p>
+      <table>
+        <thead><tr><th>ID</th><th>Risk</th><th>Score</th></tr></thead>
+        <tbody id="topRisks"></tbody>
+      </table>
+    </section>
+  </main>
+
+  <footer>Data is read live from CSV files on GitHub. Training exercise only.</footer>
 
 <script>
-// ---- Data sources (raw CSV files on GitHub) ----
+// ---- Data sources (raw CSV files on GitHub). Keep your own working URLs here. ----
 const GAP_URL  = "https://raw.githubusercontent.com/aleezakhannn/ISO27001-gap-analysis/main/iso27001_gap_analysis.csv";
 const RISK_URL = "https://raw.githubusercontent.com/aleezakhannn/Microfinco-risk-resgister/main/risk_register.csv";
 
-// ---- Minimal CSV parser (handles quoted fields) ----
+// ---- CSV parser: handles quotes, a leading BOM, and comma/semicolon/tab separators ----
 function parseCSV(text) {
+  text = text.replace(/^\uFEFF/, "");
+  // Detect the separator by counting candidates in the header line
+  const firstLine = text.split(/\r?\n/)[0];
+  const counts = { ",": 0, ";": 0, "\t": 0 };
+  for (const ch of firstLine) if (ch in counts) counts[ch]++;
+  const sep = Object.keys(counts).sort((a, b) => counts[b] - counts[a])[0];
+
   const rows = [];
   let row = [], field = "", inQuotes = false;
   for (let i = 0; i < text.length; i++) {
@@ -49,7 +109,7 @@ function parseCSV(text) {
       else if (c === '"') inQuotes = false;
       else field += c;
     } else if (c === '"') inQuotes = true;
-    else if (c === ",") { row.push(field); field = ""; }
+    else if (c === sep) { row.push(field); field = ""; }
     else if (c === "\n" || c === "\r") {
       if (c === "\r" && text[i + 1] === "\n") i++;
       row.push(field); field = "";
@@ -58,70 +118,125 @@ function parseCSV(text) {
     } else field += c;
   }
   if (field !== "" || row.length) { row.push(field); rows.push(row); }
-  // Convert to array of objects using the header row
+
   const header = rows.shift().map(h => h.trim());
   return rows.map(r => Object.fromEntries(header.map((h, i) => [h, (r[i] || "").trim()])));
 }
 
-// ---- Fetch a CSV fresh each time so the charts follow file changes ----
+// ---- Fetch fresh each load so the page follows changes to the CSV files ----
 async function loadCSV(url) {
   const res = await fetch(url, { cache: "no-store" });
   if (!res.ok) throw new Error("Could not load " + url + " (" + res.status + ")");
   return parseCSV(await res.text());
 }
 
-// ---- Bar chart: count of Implemented / Partial / Not ----
+// ---- Small plugin that prints each bar's value above it ----
+const valueLabels = {
+  id: "valueLabels",
+  afterDatasetsDraw(chart) {
+    const ctx = chart.ctx;
+    ctx.save();
+    ctx.font = "bold 16px system-ui, sans-serif";
+    ctx.fillStyle = "#0f2a4a";
+    ctx.textAlign = "center";
+    chart.getDatasetMeta(0).data.forEach((bar, i) => {
+      ctx.fillText(chart.data.datasets[0].data[i], bar.x, bar.y - 8);
+    });
+    ctx.restore();
+  }
+};
+Chart.register(valueLabels);   // must run before any chart is created
+
+// ---- Bar chart: Implemented / Partial / Not (blue shades) ----
 function drawStatusChart(controls) {
   const counts = { Implemented: 0, Partial: 0, Not: 0 };
-  controls.forEach(c => { if (c.Status in counts) counts[c.Status]++; });
+  controls.forEach(c => {
+    const s = (c.Status || "").toLowerCase();       // case-insensitive match
+    if (s.startsWith("impl")) counts.Implemented++;
+    else if (s.startsWith("part")) counts.Partial++;
+    else if (s.startsWith("not")) counts.Not++;
+  });
   new Chart(document.getElementById("statusChart"), {
     type: "bar",
     data: {
       labels: Object.keys(counts),
-      datasets: [{ label: "Number of controls", data: Object.values(counts), backgroundColor: "#1f77b4" }]
+      datasets: [{
+        label: "Number of controls",
+        data: Object.values(counts),
+        backgroundColor: ["#1d4ed8", "#3b82f6", "#93c5fd"],
+        borderRadius: 8,
+        maxBarThickness: 90
+      }]
     },
-    options: { scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } }
+    options: {
+      animation: false,                              // draw bars immediately
+      maintainAspectRatio: false,
+      layout: { padding: { top: 24 } },
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { beginAtZero: true, ticks: { precision: 0 }, grid: { color: "#e2e8f0" } },
+        x: { grid: { display: false } }
+      }
+    }
   });
+  return counts;
 }
 
-// ---- Heat map: 5x5 grid, colour by score (green to red) ----
+// ---- Colour for a score: green (1) to red (25) ----
+const scoreColor = s => "hsl(" + (120 - (s - 1) / 24 * 120) + ", 65%, 58%)";
+
+// ---- Heat map: 5x5 grid, rows = likelihood 5..1, columns = impact 1..5 ----
 function drawHeatmap(risks) {
   const el = document.getElementById("heatmap");
   el.innerHTML = "";
-  // Group risk IDs by "impact-likelihood"
-  const cells = {};
+  const cells = {};                                  // group risk IDs by "impact-likelihood"
   risks.forEach(r => {
     const key = r.Impact + "-" + r.Likelihood;
     (cells[key] = cells[key] || []).push(r["Risk ID"]);
   });
-  // Rows: likelihood 5 down to 1
   for (let l = 5; l >= 1; l--) {
-    const label = document.createElement("div");
-    label.className = "label"; label.textContent = "L" + l;
-    el.appendChild(label);
+    el.insertAdjacentHTML("beforeend", '<div class="axis">L' + l + "</div>");
     for (let i = 1; i <= 5; i++) {
-      const score = i * l;
       const cell = document.createElement("div");
       cell.className = "cell";
-      // Hue 120 = green (score 1), hue 0 = red (score 25)
-      cell.style.background = "hsl(" + (120 - (score - 1) / 24 * 120) + ", 70%, 55%)";
-      cell.title = "Impact " + i + " x Likelihood " + l + " = " + score;
-      cell.textContent = (cells[i + "-" + l] || []).join(", ");
+      cell.style.background = scoreColor(i * l);
+      cell.title = "Impact " + i + " x Likelihood " + l + " = " + (i * l);
+      (cells[i + "-" + l] || []).forEach(id => {
+        cell.insertAdjacentHTML("beforeend", '<span class="chip">' + id + "</span>");
+      });
       el.appendChild(cell);
     }
   }
-  // Bottom row: impact labels
-  el.appendChild(document.createElement("div"));
-  for (let i = 1; i <= 5; i++) {
-    const label = document.createElement("div");
-    label.className = "label"; label.textContent = "I" + i;
-    el.appendChild(label);
-  }
+  el.insertAdjacentHTML("beforeend", "<div></div>");
+  for (let i = 1; i <= 5; i++) el.insertAdjacentHTML("beforeend", '<div class="axis">I' + i + "</div>");
+}
+
+// ---- Top 5 risks table ----
+function drawTopRisks(risks) {
+  const top = [...risks].sort((a, b) => Number(b.Score) - Number(a.Score)).slice(0, 5);
+  document.getElementById("topRisks").innerHTML = top.map(r =>
+    "<tr><td>" + r["Risk ID"] + "</td><td>" + r.Description + "</td>" +
+    '<td><span class="score" style="background:' + scoreColor(Number(r.Score)) + '">' + r.Score + "</span></td></tr>"
+  ).join("");
+}
+
+// ---- Summary cards ----
+function fillKpis(counts, risks) {
+  const total = counts.Implemented + counts.Partial + counts.Not;
+  document.getElementById("kTotal").textContent = total;
+  document.getElementById("kImpl").textContent = total ? Math.round(counts.Implemented / total * 100) + "%" : "-";
+  document.getElementById("kRisks").textContent = risks.length;
+  document.getElementById("kHigh").textContent = risks.filter(r => Number(r.Score) >= 15).length;
 }
 
 // ---- Run ----
 Promise.all([loadCSV(GAP_URL), loadCSV(RISK_URL)])
-  .then(([controls, risks]) => { drawStatusChart(controls); drawHeatmap(risks); })
+  .then(([controls, risks]) => {
+    const counts = drawStatusChart(controls);
+    drawHeatmap(risks);
+    drawTopRisks(risks);
+    fillKpis(counts, risks);
+  })
   .catch(err => { document.getElementById("error").textContent = "Error: " + err.message; });
 </script>
 </body>
