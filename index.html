@@ -140,15 +140,28 @@ async function loadCSV(url) {
   return parseCSV(await res.text());
 }
 
-// ---- Count controls by status (case-insensitive) ----
+// ---- Count controls by status (finds the Status column by name, case-insensitive) ----
 function countStatus(controls) {
   const counts = { Implemented: 0, Partial: 0, Not: 0 };
+  if (!controls.length) {
+    showError("Gap analysis file loaded but has 0 rows. Check GAP_URL.");
+    return counts;
+  }
+  const keys = Object.keys(controls[0]);
+  const statusKey = keys.find(k => k.toLowerCase().includes("status"));
+  if (!statusKey) {
+    showError("No Status column found. Columns seen: " + keys.join(" / "));
+    return counts;
+  }
   controls.forEach(c => {
-    const s = (c.Status || "").toLowerCase();
+    const s = (c[statusKey] || "").toLowerCase().trim();
     if (s.startsWith("impl")) counts.Implemented++;
     else if (s.startsWith("part")) counts.Partial++;
     else if (s.startsWith("not")) counts.Not++;
   });
+  if (counts.Implemented + counts.Partial + counts.Not === 0) {
+    showError("Status column found but no values matched. First value: '" + (controls[0][statusKey] || "") + "'");
+  }
   return counts;
 }
 
