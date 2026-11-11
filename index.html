@@ -133,13 +133,17 @@ function parseCSV(text) {
   return rows.map(r => Object.fromEntries(header.map((h, i) => [h, (r[i] || "").trim()])));
 }
 
-// ---- Fetch fresh each load so the page follows changes to the CSV files ----
+// ---- Fetch fresh each load; detects UTF-16 files by their byte order mark ----
 async function loadCSV(url) {
   const res = await fetch(url, { cache: "no-store" });
   if (!res.ok) throw new Error("Could not load " + url + " (" + res.status + ")");
-  return parseCSV(await res.text());
+  const buf = await res.arrayBuffer();
+  const b = new Uint8Array(buf);
+  let encoding = "utf-8";
+  if (b[0] === 0xFF && b[1] === 0xFE) encoding = "utf-16le";
+  else if (b[0] === 0xFE && b[1] === 0xFF) encoding = "utf-16be";
+  return parseCSV(new TextDecoder(encoding).decode(buf));
 }
-
 // ---- Count controls by status (finds the Status column by name, case-insensitive) ----
 function countStatus(controls) {
   const counts = { Implemented: 0, Partial: 0, Not: 0 };
